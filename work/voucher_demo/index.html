@@ -1,0 +1,371 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>每日凭证预生成 Demo</title>
+  <style>
+    :root {
+      --bg: #f6f7f9;
+      --panel: #ffffff;
+      --line: #d9dee7;
+      --text: #1f2937;
+      --muted: #667085;
+      --blue: #1f6feb;
+      --green: #18794e;
+      --red: #b42318;
+      --amber: #b54708;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); }
+    header { height: 56px; display: flex; align-items: center; justify-content: space-between; padding: 0 18px; background: #162033; color: #fff; }
+    header h1 { margin: 0; font-size: 18px; font-weight: 650; letter-spacing: 0; }
+    button, input, select { font: inherit; }
+    button { border: 1px solid var(--line); background: #fff; color: var(--text); height: 32px; padding: 0 10px; border-radius: 6px; cursor: pointer; }
+    button.primary { background: var(--blue); color: #fff; border-color: var(--blue); }
+    button.ghost { background: transparent; color: #fff; border-color: rgba(255,255,255,.28); }
+    button.danger { color: var(--red); }
+    input, select { height: 32px; border: 1px solid var(--line); border-radius: 6px; padding: 0 8px; background: #fff; min-width: 0; }
+    .importbar { display: grid; grid-template-columns: minmax(260px, 1fr) auto minmax(260px, 1.4fr); gap: 10px; align-items: center; padding: 10px 18px; border-bottom: 1px solid var(--line); background: #fbfcfe; }
+    .importbar input[type="file"] { padding: 4px 8px; height: 34px; background: #fff; }
+    .bank-summary { display: flex; gap: 8px; align-items: center; overflow: auto; color: var(--muted); font-size: 12px; white-space: nowrap; }
+    .bank-chip { display: inline-flex; align-items: center; height: 26px; padding: 0 8px; border: 1px solid var(--line); border-radius: 999px; background: #fff; }
+    .toolbar { display: grid; grid-template-columns: 150px 120px auto auto auto 1fr auto; gap: 10px; align-items: center; padding: 12px 18px; border-bottom: 1px solid var(--line); background: #fff; }
+    .metric { color: var(--muted); font-size: 13px; white-space: nowrap; }
+    .layout { display: grid; grid-template-columns: 360px 1fr; gap: 12px; padding: 12px; height: calc(100vh - 158px); }
+    .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; min-height: 0; overflow: hidden; }
+    .panel-head { height: 42px; display: flex; align-items: center; justify-content: space-between; padding: 0 12px; border-bottom: 1px solid var(--line); }
+    .panel-head strong { font-size: 14px; }
+    .list { overflow: auto; height: calc(100% - 42px); }
+    .voucher-item { width: 100%; border: 0; border-bottom: 1px solid var(--line); background: #fff; text-align: left; padding: 10px 12px; height: auto; border-radius: 0; display: block; }
+    .voucher-item.active { background: #eef5ff; box-shadow: inset 3px 0 0 var(--blue); }
+    .voucher-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
+    .voucher-title { font-weight: 650; font-size: 14px; }
+    .voucher-desc { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .tag { display: inline-flex; align-items: center; height: 22px; padding: 0 7px; border-radius: 999px; font-size: 12px; background: #eef2f6; color: #344054; white-space: nowrap; }
+    .tag.warn { background: #fff4e5; color: var(--amber); }
+    .tag.ok { background: #e9f7ef; color: var(--green); }
+    .tag.low { background: #fff4e5; color: var(--amber); }
+    .editor { display: grid; grid-template-rows: auto auto 1fr auto; height: 100%; }
+    .voucher-form { display: grid; grid-template-columns: 110px 90px 1fr 130px 150px; gap: 10px; padding: 12px; border-bottom: 1px solid var(--line); align-items: end; }
+    label { display: grid; gap: 4px; color: var(--muted); font-size: 12px; }
+    label span { white-space: nowrap; }
+    .source-box { padding: 10px 12px; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 13px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+    .source-box b { color: var(--text); font-weight: 600; }
+    .table-wrap { overflow: auto; }
+    table { width: 100%; border-collapse: collapse; min-width: 1160px; }
+    th, td { border-bottom: 1px solid var(--line); border-right: 1px solid var(--line); padding: 6px; vertical-align: middle; }
+    th { position: sticky; top: 0; background: #f8fafc; z-index: 1; color: #475467; font-size: 12px; font-weight: 650; }
+    th.action-col, td.action-col { position: sticky; right: 0; background: #fff; z-index: 2; min-width: 58px; text-align: center; }
+    th.action-col { background: #f8fafc; z-index: 3; }
+    td input { width: 100%; border: 1px solid transparent; background: transparent; height: 28px; border-radius: 4px; }
+    td input:focus { border-color: var(--blue); background: #fff; outline: none; }
+    td.num input { text-align: right; font-variant-numeric: tabular-nums; }
+    .bottom { display: grid; grid-template-columns: 1fr auto auto auto; gap: 10px; align-items: center; padding: 10px 12px; border-top: 1px solid var(--line); }
+    .balance { font-variant-numeric: tabular-nums; color: var(--muted); }
+    .balance.bad { color: var(--red); font-weight: 650; }
+    .issues { max-height: 96px; overflow: auto; padding: 8px 12px; background: #fffdf7; border-top: 1px solid #f6d58f; font-size: 12px; color: var(--amber); }
+    .empty { height: 100%; display: grid; place-items: center; color: var(--muted); }
+    .modal { position: fixed; inset: 0; display: none; background: rgba(15, 23, 42, .42); z-index: 20; padding: 28px; }
+    .modal.open { display: grid; place-items: center; }
+    .modal-box { width: min(1280px, 96vw); height: min(760px, 90vh); background: #fff; border-radius: 8px; border: 1px solid var(--line); display: grid; grid-template-rows: auto auto 1fr; overflow: hidden; }
+    .modal-head { height: 46px; display: flex; align-items: center; justify-content: space-between; padding: 0 14px; border-bottom: 1px solid var(--line); }
+    .modal-tools { display: flex; gap: 8px; align-items: center; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+    .modal-table { overflow: auto; }
+    .modal-table table { min-width: 1500px; }
+    @media (max-width: 980px) {
+      .importbar { grid-template-columns: 1fr; }
+      .toolbar { grid-template-columns: 1fr 1fr; }
+      .layout { grid-template-columns: 1fr; height: auto; }
+      .panel { min-height: 420px; }
+      .source-box, .voucher-form { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>每日凭证预生成 Demo</h1>
+    <button class="ghost" id="renumberBtn">重新连续编号</button>
+  </header>
+
+  <section class="importbar">
+    <input id="bankFiles" type="file" multiple accept=".xlsx,.xls" />
+    <button id="importBtn">导入银行流水</button>
+    <div class="bank-summary" id="bankSummary">读取账户汇总中...</div>
+  </section>
+
+  <section class="toolbar">
+    <select id="dateSelect"></select>
+    <input id="startNo" type="number" min="1" value="1" />
+    <button class="primary" id="generateBtn">生成当日凭证</button>
+    <button id="manualBtn">新增手工凭证</button>
+    <button id="txBtn">查看流水</button>
+    <button id="validateBtn">校验</button>
+    <div class="metric" id="summary">未生成</div>
+    <button id="exportBtn">导出 CSV</button>
+  </section>
+
+  <section class="modal" id="txModal">
+    <div class="modal-box">
+      <div class="modal-head"><strong>统一银行流水池</strong><button id="closeTxBtn">关闭</button></div>
+      <div class="modal-tools">
+        <button id="allTxBtn">全部流水</button>
+        <button id="dayTxBtn">当前日期</button>
+        <span class="metric" id="txCount"></span>
+      </div>
+      <div class="modal-table" id="txTable"></div>
+    </div>
+  </section>
+
+  <main class="layout">
+    <aside class="panel">
+      <div class="panel-head"><strong>当日凭证池</strong><span class="metric" id="rangeText"></span></div>
+      <div class="list" id="voucherList"></div>
+    </aside>
+    <section class="panel editor" id="editor">
+      <div class="empty">请选择或生成一张凭证</div>
+    </section>
+  </main>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    let vouchers = [];
+    let selected = -1;
+    let issues = [];
+    let bankSummary = null;
+
+    const money = (v) => Number.parseFloat(v || 0) || 0;
+    const fmt = (v) => money(v).toFixed(2);
+    const uid = () => 'MANUAL-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 6);
+
+    async function init() {
+      await refreshDates();
+      $('generateBtn').onclick = generate;
+      $('manualBtn').onclick = addManual;
+      $('validateBtn').onclick = validate;
+      $('exportBtn').onclick = exportCsv;
+      $('renumberBtn').onclick = renumber;
+      $('importBtn').onclick = importBanks;
+      $('txBtn').onclick = () => showTransactions('day');
+      $('closeTxBtn').onclick = closeTransactions;
+      $('allTxBtn').onclick = () => showTransactions('all');
+      $('dayTxBtn').onclick = () => showTransactions('day');
+      await loadBankSummary();
+    }
+
+    async function refreshDates(selectedDate = null) {
+      const res = await fetch('/api/dates');
+      const data = await res.json();
+      $('dateSelect').innerHTML = data.dates.map(d => `<option value="${d}">${d}</option>`).join('');
+      if (selectedDate && data.dates.includes(selectedDate)) $('dateSelect').value = selectedDate;
+    }
+
+    async function loadBankSummary() {
+      const res = await fetch('/api/banks');
+      bankSummary = await res.json();
+      renderBankSummary();
+    }
+
+    function renderBankSummary(extra = '') {
+      const host = $('bankSummary');
+      const accounts = bankSummary?.accounts || [];
+      const chips = accounts.map(a => `<span class="bank-chip">${a.bank} ${a.rows}笔 收${fmt(a.income)} 付${fmt(a.expense)} ${a.date_range}</span>`).join('');
+      host.innerHTML = (chips || '<span class="bank-chip">暂无银行流水</span>') + (extra ? `<span>${extra}</span>` : '');
+    }
+
+    async function importBanks() {
+      const files = Array.from($('bankFiles').files || []);
+      if (!files.length) { alert('请选择一个或多个银行流水文件。'); return; }
+      const currentDate = $('dateSelect').value;
+      const form = new FormData();
+      files.forEach(file => form.append('files', file));
+      $('importBtn').disabled = true;
+      $('importBtn').textContent = '导入中...';
+      try {
+        const res = await fetch('/api/import', { method: 'POST', body: form });
+        const data = await res.json();
+        bankSummary = data.summary;
+        await refreshDates(currentDate);
+        const text = (data.results || []).map(r => `${r.file}:${r.status}${r.message ? '(' + r.message + ')' : ''}`).join('；');
+        renderBankSummary(text);
+      } finally {
+        $('importBtn').disabled = false;
+        $('importBtn').textContent = '导入银行流水';
+      }
+    }
+
+    async function showTransactions(scope = 'day') {
+      const query = scope === 'day' ? `?date=${encodeURIComponent($('dateSelect').value)}` : '';
+      const res = await fetch('/api/transactions' + query);
+      const data = await res.json();
+      $('txModal').classList.add('open');
+      $('txCount').textContent = `${scope === 'day' ? $('dateSelect').value : '全部'}：${data.count} 笔`;
+      renderTransactions(data.rows || []);
+    }
+
+    function closeTransactions() {
+      $('txModal').classList.remove('open');
+    }
+
+    function renderTransactions(rows) {
+      const host = $('txTable');
+      if (!rows.length) { host.innerHTML = '<div class="empty">没有流水</div>'; return; }
+      host.innerHTML = `<table>
+        <thead><tr><th>银行</th><th>账号</th><th>交易时间</th><th>方向</th><th>金额</th><th>对方户名</th><th>对方账号</th><th>交易类型</th><th>用途</th><th>摘要</th><th>银行档案</th><th>来源文件</th></tr></thead>
+        <tbody>${rows.map(r => `<tr><td>${r.bank}</td><td>${r.account}</td><td>${r.time}</td><td>${r.direction}</td><td class="num">${fmt(r.amount)}</td><td>${r.counterparty}</td><td>${r.counterparty_account}</td><td>${r.type}</td><td>${r.purpose}</td><td>${r.summary}</td><td>${r.bank_code}</td><td>${r.source_file}</td></tr>`).join('')}</tbody>
+      </table>`;
+    }
+
+    async function generate() {
+      const day = $('dateSelect').value;
+      const start = Number.parseInt($('startNo').value || '1', 10);
+      const res = await fetch(`/api/generate?date=${encodeURIComponent(day)}&start=${start}`);
+      const data = await res.json();
+      vouchers = data.vouchers;
+      issues = data.issues;
+      selected = vouchers.length ? 0 : -1;
+      render();
+    }
+
+    function addManual() {
+      const day = $('dateSelect').value;
+      const nextNo = vouchers.length ? Math.max(...vouchers.map(v => Number(v.number) || 0)) + 1 : Number($('startNo').value || 1);
+      vouchers.push({
+        id: uid(), date: day, number: nextNo, source: '手工录入', status: '人工修改', confidence: '人工', bank_ref: '', bank_time: '', bank_account: '', counterparty: '', amount: 0, direction: 'manual', description: '手工凭证', invoice_refs: [],
+        entries: [
+          { summary: '手工凭证', subject_code: '', subject_name: '', debit: 0, credit: 0, customer_code: '', customer_name: '', supplier_code: '', supplier_name: '', department_code: '', project_code: '', bank_code: '', cashflow_code: '' },
+          { summary: '手工凭证', subject_code: '', subject_name: '', debit: 0, credit: 0, customer_code: '', customer_name: '', supplier_code: '', supplier_name: '', department_code: '', project_code: '', bank_code: '', cashflow_code: '' }
+        ]
+      });
+      selected = vouchers.length - 1;
+      renumber(false);
+      render();
+    }
+
+    function renumber(doRender = true) {
+      const start = Number.parseInt($('startNo').value || '1', 10);
+      vouchers.forEach((v, i) => v.number = start + i);
+      if (doRender) render();
+    }
+
+    async function validate() {
+      syncEditor();
+      const res = await fetch('/api/validate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ vouchers }) });
+      issues = (await res.json()).issues;
+      render();
+    }
+
+    async function exportCsv() {
+      syncEditor();
+      const res = await fetch('/api/export', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ vouchers }) });
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `voucher-demo-${$('dateSelect').value}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function updateSummary() {
+      const count = vouchers.length;
+      const auto = vouchers.filter(v => v.source === '银行流水').length;
+      const manual = vouchers.filter(v => v.source === '手工录入').length;
+      const start = count ? vouchers[0].number : $('startNo').value;
+      const end = count ? vouchers[count - 1].number : '';
+      $('summary').textContent = count ? `共 ${count} 张，银行 ${auto} 张，手工 ${manual} 张，问题 ${issues.length} 条` : '未生成';
+      $('rangeText').textContent = count ? `${start} - ${end}` : '';
+    }
+
+    function renderList() {
+      const box = $('voucherList');
+      if (!vouchers.length) { box.innerHTML = '<div class="empty">暂无凭证</div>'; return; }
+      box.innerHTML = vouchers.map((v, i) => {
+        const tagClass = v.status === '通用待确认' ? 'warn' : 'ok';
+        const desc = `${v.counterparty || v.source} ${fmt(v.amount)} ${v.description || ''}`;
+        return `<button class="voucher-item ${i === selected ? 'active' : ''}" onclick="selectVoucher(${i})">
+          <div class="voucher-row"><span class="voucher-title">${v.number}. ${v.date}</span><span class="tag ${tagClass}">${v.status}</span></div>
+          <div class="voucher-desc">${desc}</div>
+        </button>`;
+      }).join('');
+    }
+
+    window.selectVoucher = (i) => { syncEditor(); selected = i; render(); };
+
+    function renderEditor() {
+      const host = $('editor');
+      if (selected < 0 || !vouchers[selected]) { host.innerHTML = '<div class="empty">请选择或生成一张凭证</div>'; return; }
+      const v = vouchers[selected];
+      const debit = v.entries.reduce((s, e) => s + money(e.debit), 0);
+      const credit = v.entries.reduce((s, e) => s + money(e.credit), 0);
+      const bad = Math.abs(debit - credit) > 0.01;
+      host.innerHTML = `
+        <div class="voucher-form">
+          <label><span>凭证日期</span><input data-v="date" value="${v.date || ''}"></label>
+          <label><span>凭证号</span><input data-v="number" type="number" value="${v.number || ''}"></label>
+          <label><span>状态</span><input data-v="status" value="${v.status || ''}"></label>
+          <label><span>来源</span><input value="${v.source || ''}" disabled></label>
+          <label><span>置信度</span><input data-v="confidence" value="${v.confidence || ''}"></label>
+        </div>
+        <div class="source-box">
+          <div>流水：<b>${v.bank_ref || '-'}</b></div><div>时间：<b>${v.bank_time || '-'}</b></div><div>对方：<b>${v.counterparty || '-'}</b></div><div>发票：<b>${(v.invoice_refs || []).join(';') || '-'}</b></div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>摘要</th><th>科目编码</th><th>科目名称</th><th>借方</th><th>贷方</th><th>客户编码</th><th>客户名称</th><th>供应商编码</th><th>供应商名称</th><th>部门</th><th>项目</th><th>银行档案</th><th class="action-col">操作</th></tr></thead>
+            <tbody>${v.entries.map((e, i) => rowHtml(e, i)).join('')}</tbody>
+          </table>
+        </div>
+        <div class="bottom">
+          <div class="balance ${bad ? 'bad' : ''}">借方 ${fmt(debit)} / 贷方 ${fmt(credit)} / 差额 ${fmt(debit - credit)}</div>
+          <button onclick="addEntry()">新增分录</button>
+          <button class="danger" onclick="deleteVoucher()">删除凭证</button>
+          <button class="primary" onclick="saveAndValidate()">保存并校验</button>
+        </div>
+        ${issues.length ? `<div class="issues">${issues.slice(0, 8).map(x => `凭证${x.voucher || ''}：${x.message}`).join('<br>')}</div>` : ''}
+      `;
+    }
+
+    function rowHtml(e, i) {
+      const fields = ['summary', 'subject_code', 'subject_name', 'debit', 'credit', 'customer_code', 'customer_name', 'supplier_code', 'supplier_name', 'department_code', 'project_code', 'bank_code'];
+      return `<tr data-row="${i}">${fields.map(f => `<td class="${f === 'debit' || f === 'credit' ? 'num' : ''}"><input data-e="${f}" value="${e[f] ?? ''}"></td>`).join('')}<td class="action-col"><button class="danger" title="删除分录" onclick="removeEntry(${i})">删除</button></td></tr>`;
+    }
+
+    function syncEditor() {
+      if (selected < 0 || !vouchers[selected]) return;
+      const host = $('editor');
+      const v = vouchers[selected];
+      host.querySelectorAll('[data-v]').forEach(input => {
+        const key = input.dataset.v;
+        v[key] = key === 'number' ? Number.parseInt(input.value || '0', 10) : input.value;
+      });
+      host.querySelectorAll('tr[data-row]').forEach(tr => {
+        const idx = Number(tr.dataset.row);
+        tr.querySelectorAll('[data-e]').forEach(input => {
+          const key = input.dataset.e;
+          v.entries[idx][key] = key === 'debit' || key === 'credit' ? money(input.value) : input.value;
+        });
+      });
+    }
+
+    window.addEntry = () => { syncEditor(); vouchers[selected].entries.push({ summary: '', subject_code: '', subject_name: '', debit: 0, credit: 0, customer_code: '', customer_name: '', supplier_code: '', supplier_name: '', department_code: '', project_code: '', bank_code: '', cashflow_code: '' }); render(); };
+    window.removeEntry = (i) => {
+      syncEditor();
+      const v = vouchers[selected];
+      if (!v || v.entries.length <= 1) { alert('至少保留一条分录。'); return; }
+      const entry = v.entries[i];
+      if (v.source === '银行流水' && entry && entry.subject_code === '1002') {
+        alert('银行流水自动生成的银行存款分录用于对账，不能直接删除。可以修改其他分录，或删除整张凭证后重新生成。');
+        return;
+      }
+      v.entries.splice(i, 1);
+      render();
+    };
+    window.deleteVoucher = () => { vouchers.splice(selected, 1); selected = Math.min(selected, vouchers.length - 1); renumber(false); render(); };
+    window.saveAndValidate = async () => { await validate(); };
+
+    function render() { updateSummary(); renderList(); renderEditor(); }
+    init();
+  </script>
+</body>
+</html>

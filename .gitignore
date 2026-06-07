@@ -1,0 +1,8 @@
+.DS_Store
+outputs/
+work/pydeps/
+work/**/__pycache__/
+*.pyc
+.venv/
+node_modules/
+work/node_modules
